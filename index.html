@@ -241,6 +241,13 @@
 	}
 
 	.aviso-footer { grid-column: 1 / -1; text-align: center; color: var(--text-secondary); font-size: 0.8rem; margin-top: 15px; }
+	
+	.firma-autor {
+		font-size: 0.75rem;
+		color: #a1a1a6;
+		margin-top: 8px;
+		display: block;
+	}
 
 	/* --- VENTANA MODAL --- */
 	.modal-overlay {
@@ -300,7 +307,6 @@
 	let VR2 = 0;
 	let ultimo_pv = 0;
 
-	// CARGA AUTOMÁTICA MEDIANTE FETCH DE LA RAÍZ DEL PROYECTO
 	function cargarCSVDirecto() {
 		fetch('PVP y RV.csv')
 			.then(response => {
@@ -320,7 +326,6 @@
 			});
 	}
 
-	// PROCESADO DEL TEXTO DEL CSV
 	function procesarContenidoCSV(contents) {
 		const lineas = contents.split(/\r?\n/);
 		
@@ -366,7 +371,6 @@
 		familias["Familia iPhone 17"] = [...new Set(familias["Familia iPhone 17"])];
 		familias["Familia iPhone 16 & Anteriores"] = [...new Set(familias["Familia iPhone 16 & Anteriores"])];
 
-		// Ocultar mensaje cargando y desvelar espacio de trabajo
 		document.getElementById("upload-container").style.display = "none";
 		document.getElementById("workspace").style.display = "grid";
 		construirFamilias();
@@ -457,15 +461,6 @@
 		});
 	}
 
-	function desplazarAbajo() {
-		setTimeout(() => {
-			window.scrollTo({
-				top: document.body.scrollHeight,
-				behavior: 'smooth'
-			});
-		}, 50);
-	}
-
 	function abrirModalPrecio() {
 		const modal = document.getElementById("custom-price-modal");
 		const input = document.getElementById("modal-price-input");
@@ -492,6 +487,15 @@
 		}
 	}
 
+	function despazarAbajo() {
+		setTimeout(() => {
+			window.scrollTo({
+				top: document.body.scrollHeight,
+				behavior: 'smooth'
+			});
+		}, 50);
+	}
+
 	function calcula(pv, rate, nper, fv) {
 		return (rate * (pv - fv / Math.pow(1 + rate, nper))) / (1 - Math.pow(1 + rate, -nper));
 	}
@@ -499,8 +503,10 @@
 	function calculaCarenciaPrimerAnio(pv, rate, nper, fv) {
 		let cuotaPrimerAnio = (pv - fv) / nper;
 		let saldoFinAnio1 = pv - (cuotaPrimerAnio * 12);
-		let nperRestante = nper - 12;
-		let cuotaSiguientesAnios = calcula(saldoFinAnio1, rate, nperRestante, fv);
+		
+		let factorInteres = Math.pow(1 + rate, 12);
+		let cuotaSiguientesAnios = (rate * (saldoFinAnio1 - fv / factorInteres)) / (1 - Math.pow(1 + rate, -12));
+		
 		return { cuota1: cuotaPrimerAnio, cuota2: cuotaSiguientesAnios };
 	}
 
@@ -571,9 +577,15 @@
 		return (Math.round((valor + Number.EPSILON) * 100) / 100);
 	}
 
+	function actualizarFirmaFechas() {
+		const anioActual = new Date().getFullYear();
+		const textoRango = anioActual > 2026 ? `2026 - ${anioActual}` : '2026';
+		document.getElementById("rango-fechas").textContent = textoRango;
+	}
+
 	document.addEventListener('DOMContentLoaded', () => {
-		// Inicialización automática desde la raíz del proyecto
 		cargarCSVDirecto();
+		actualizarFirmaFechas();
 
 		document.getElementById('soloSegundoAnio').addEventListener('change', () => {
 			if (ultimo_pv > 0) {
@@ -629,7 +641,8 @@
 				<div class="aviso-footer">
 					<hr>
 					<b>Los valores reflejados son meramente aproximados y orientativos.</b>
-					<br><span style="font-size: 0.75rem; color: #a1a1a6;">No imprimas esta pantalla.</span>
+					<br>No imprimas esta pantalla.
+					<span class="firma-autor">Ben A. M. © <span id="rango-fechas">2026</span></span>
 				</div>
 			</div>
 		</div>
