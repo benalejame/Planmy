@@ -502,20 +502,6 @@
 		return (rate * (pv - fv / Math.pow(1 + rate, nper))) / (1 - Math.pow(1 + rate, -nper));
 	}
 
-	// LÓGICA DE EXENCIÓN MATEMÁTICAMENTE EXACTA (Amortización lineal + año 2 completo con intereses sobre saldo vivo total)
-	function calculaCarenciaPrimerAnio(pv, rate, nper, fv) {
-		// 1. Amortización lineal pura durante los primeros 12 meses (sin aplicar intereses)
-		let cuotaPrimerAnio = (pv - fv) / nper; 
-		
-		// 2. Saldo deudor exacto que pasa al inicio del mes 13 (Año 2)
-		let saldoFinAnio1 = pv - (cuotaPrimerAnio * 12);
-		
-		// 3. Sistema francés sobre las 12 cuotas restantes, descontando correctamente el impacto financiero del VR al mes 24
-		let cuotaSiguientesAnios = (rate * (saldoFinAnio1 - fv / Math.pow(1 + rate, 12))) / (1 - Math.pow(1 + rate, -12));
-		
-		return { cuota1: cuotaPrimerAnio, cuota2: cuotaSiguientesAnios };
-	}
-
 	function dibujaCuota(pv, fv, fv2) {	
 		const TIN24 = 10.57;
 		const TIN36 = 11.42;
@@ -526,12 +512,21 @@
 		let pmt24, intereses24, textoCuotas24, totalPagar24;
 
 		if (exentoPrimerAnio) {
-			let plan24 = calculaCarenciaPrimerAnio(pv, rate24, 24, fv);
-			pmt24 = plan24.cuota2;
-			totalPagar24 = (plan24.cuota1 * 12) + (plan24.cuota2 * 12) + fv;
+			// 1. Amortización lineal estricta sin intereses en el primer año
+			let cuota1 = (pv - fv) / 24;
+			
+			// 2. Saldo vivo exacto al principio del mes 13 (Año 2)
+			let saldoFinAnio1 = pv - (cuota1 * 12);
+			
+			// 3. Fórmula francesa corregida con paréntesis explícitos para forzar precedencia sobre el VR (fv)
+			let cuota2 = (rate24 * (saldoFinAnio1 - (fv / Math.pow(1 + rate24, 12)))) / (1 - Math.pow(1 + rate24, -12));
+			
+			pmt24 = cuota2;
+			totalPagar24 = (cuota1 * 12) + (cuota2 * 12) + fv;
 			intereses24 = totalPagar24 - pv;
-			textoCuotas24 = '<span class="cuota-numero-azul">12</span> cuotas de <span class="cuota-highlight">' + redondea(plan24.cuota1) + ' €</span> <small style="color: var(--text-secondary); display: block;">(1er año sin intereses)</small>' +
-			                'y <span class="cuota-numero-azul">12</span> cuotas de <span class="cuota-highlight">' + redondea(plan24.cuota2) + ' €</span> <small style="color: var(--text-secondary); display: block; margin-bottom: 6px;">(2º año con intereses)</small>';
+			
+			textoCuotas24 = '<span class="cuota-numero-azul">12</span> cuotas de <span class="cuota-highlight">' + redondea(cuota1) + ' €</span> <small style="color: var(--text-secondary); display: block;">(1er año sin intereses)</small>' +
+			                'y <span class="cuota-numero-azul">12</span> cuotas de <span class="cuota-highlight">' + redondea(cuota2) + ' €</span> <small style="color: var(--text-secondary); display: block; margin-bottom: 6px;">(2º año con intereses)</small>';
 		} else {
 			pmt24 = calcula(pv, rate24, 24, fv);
 			totalPagar24 = (pmt24 * 24) + fv;
