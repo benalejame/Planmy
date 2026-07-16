@@ -489,7 +489,6 @@
 		}
 	}
 
-	// Función corregida y unificada para asegurar el scroll fluido al fondo en móviles
 	function desplazarAbajo() {
 		setTimeout(() => {
 			window.scrollTo({
@@ -503,12 +502,17 @@
 		return (rate * (pv - fv / Math.pow(1 + rate, nper))) / (1 - Math.pow(1 + rate, -nper));
 	}
 
-	// Corrección matemática para que el Valor Residual compute correctamente a 24 meses vista
+	// Corrección matemática definitiva: Carencia del 1er año respetando la capitalización del VR en el 2º año
 	function calculaCarenciaPrimerAnio(pv, rate, nper, fv) {
+		// 1. En el año sin intereses, las primeras 12 cuotas amortizan linealmente la mitad de la diferencia (PVP - VR)
 		let cuotaPrimerAnio = (pv - fv) / nper;
+		
+		// 2. Saldo vivo exacto que queda pendiente al arrancar el mes 13 (Añio 2)
 		let saldoFinAnio1 = pv - (cuotaPrimerAnio * 12);
 		
-		let cuotaSiguientesAnios = (rate * (saldoFinAnio1 - fv / Math.pow(1 + rate, 12))) / (1 - Math.pow(1 + rate, -12));
+		// 3. Fórmula francesa aplicada al año 2, descontando los 12 meses correspondientes al devengo sobre el VR (fv)
+		let factorDescuentoVR = fv / Math.pow(1 + rate, 12);
+		let cuotaSiguientesAnios = (rate * (saldoFinAnio1 - factorDescuentoVR)) / (1 - Math.pow(1 + rate, -12));
 		
 		return { cuota1: cuotaPrimerAnio, cuota2: cuotaSiguientesAnios };
 	}
