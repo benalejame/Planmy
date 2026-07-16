@@ -512,21 +512,25 @@
 		let pmt24, intereses24, textoCuotas24, totalPagar24;
 
 		if (exentoPrimerAnio) {
-			// 1. Amortización lineal estricta sin intereses en el primer año
+			// 1. Primer año: Amortización puramente lineal (sin intereses) de la mitad de las cuotas
 			let cuota1 = (pv - fv) / 24;
 			
-			// 2. Saldo vivo exacto al principio del mes 13 (Año 2)
+			// 2. Saldo vivo exacto restante al inicio del segundo año (mes 13)
 			let saldoFinAnio1 = pv - (cuota1 * 12);
 			
-			// 3. Fórmula francesa corregida con paréntesis explícitos para forzar precedencia sobre el VR (fv)
-			let cuota2 = (rate24 * (saldoFinAnio1 - (fv / Math.pow(1 + rate24, 12)))) / (1 - Math.pow(1 + rate24, -12));
+			// 3. Cuota del 2º año: Amortización de la otra mitad + intereses de todo el capital vivo acumulado (incluido el VR)
+			let cuota2 = (rate24 * saldoFinAnio1) / (1 - Math.pow(1 + rate24, -12));
 			
-			pmt24 = cuota2;
-			totalPagar24 = (cuota1 * 12) + (cuota2 * 12) + fv;
+			// Ajuste exacto para reflejar que el VR se aplaza al mes 24 completo y suma su interés correspondiente
+			let interesVR_año2 = fv * rate24 * 12;
+			let cuota2_final = cuota2 + (interesVR_año2 / 12);
+
+			pmt24 = cuota2_final;
+			totalPagar24 = (cuota1 * 12) + (cuota2_final * 12) + fv;
 			intereses24 = totalPagar24 - pv;
 			
 			textoCuotas24 = '<span class="cuota-numero-azul">12</span> cuotas de <span class="cuota-highlight">' + redondea(cuota1) + ' €</span> <small style="color: var(--text-secondary); display: block;">(1er año sin intereses)</small>' +
-			                'y <span class="cuota-numero-azul">12</span> cuotas de <span class="cuota-highlight">' + redondea(cuota2) + ' €</span> <small style="color: var(--text-secondary); display: block; margin-bottom: 6px;">(2º año con intereses)</small>';
+			                'y <span class="cuota-numero-azul">12</span> cuotas de <span class="cuota-highlight">' + redondea(cuota2_final) + ' €</span> <small style="color: var(--text-secondary); display: block; margin-bottom: 6px;">(2º año con intereses)</small>';
 		} else {
 			pmt24 = calcula(pv, rate24, 24, fv);
 			totalPagar24 = (pmt24 * 24) + fv;
