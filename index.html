@@ -453,9 +453,9 @@
 				btn.classList.add("selected");
 				capacidadSeleccionada = cap;
 				const data = datos_completos[modeloSeleccionado][cap];
-				ultimo_pv = data["PVP"];
-				VR = data["VR"];
-				VR2 = data["VR2"];
+				ultimo_pv = parseFloat(data["PVP"]);
+				VR = parseFloat(data["VR"]);
+				VR2 = parseFloat(data["VR2"]);
 				dibujaCuota(ultimo_pv, VR, VR2);
 				desplazarAbajo();
 			});
@@ -478,7 +478,7 @@
 
 	function confirmarNuevoPrecio() {
 		const input = document.getElementById("modal-price-input");
-		let nuevo_pv = parseInt(input.value);
+		let nuevo_pv = parseFloat(input.value);
 		if (nuevo_pv != null && !isNaN(nuevo_pv) && nuevo_pv > 0) {
 			ultimo_pv = nuevo_pv;
 			dibujaCuota(nuevo_pv, VR, VR2);
@@ -499,7 +499,11 @@
 	}
 
 	function calcula(pv, rate, nper, fv) {
-		return (rate * (pv - fv / Math.pow(1 + rate, nper))) / (1 - Math.pow(1 + rate, -nper));
+		let p = parseFloat(pv);
+		let r = parseFloat(rate);
+		let n = parseFloat(nper);
+		let f = parseFloat(fv);
+		return (r * (p - f / Math.pow(1 + r, n))) / (1 - Math.pow(1 + r, -n));
 	}
 
 	function dibujaCuota(pv, fv, fv2) {	
@@ -507,45 +511,49 @@
 		const TIN36 = 11.42;
 		const exentoPrimerAnio = document.getElementById('soloSegundoAnio').checked;
 
+		let num_pv = parseFloat(pv);
+		let num_fv = parseFloat(fv);
+		let num_fv2 = parseFloat(fv2);
+
 		// --- 24 meses ---
-		let rate24 = TIN24/100/12; 
+		let rate24 = (TIN24 / 100) / 12; 
 		let pmt24, intereses24, textoCuotas24, totalPagar24;
 
 		if (exentoPrimerAnio) {
-			// 1. Primer año: Cuota limpia de amortización lineal sin intereses
-			let cuota1 = (pv - fv) / 24;
+			// 1. Primer año: Amortización puramente lineal libre de intereses
+			let cuota1 = (num_pv - num_fv) / 24;
 			
-			// 2. Saldo pendiente real al inicio del mes 13 (Año 2)
-			let saldoFinAnio1 = pv - (cuota1 * 12);
+			// 2. Saldo vivo exacto al inicio del mes 13 (Año 2)
+			let saldoFinAnio1 = num_pv - (cuota1 * 12);
 			
-			// 3. Cuota real del 2º año: Amortización francesa de la otra mitad del capital + intereses mensuales del VR
-			let cuota2 = (rate24 * (saldoFinAnio1 - fv)) / (1 - Math.pow(1 + rate24, -12)) + (fv * rate24);
+			// 3. Ecuación financiera exacta forzada para Año 2
+			let cuota2 = (rate24 * (saldoFinAnio1 - num_fv)) / (1 - Math.pow(1 + rate24, -12)) + (num_fv * rate24);
 
 			pmt24 = cuota2;
-			totalPagar24 = (cuota1 * 12) + (cuota2 * 12) + fv;
-			intereses24 = totalPagar24 - pv;
+			totalPagar24 = (cuota1 * 12) + (cuota2 * 12) + num_fv;
+			intereses24 = totalPagar24 - num_pv;
 			
 			textoCuotas24 = '<span class="cuota-numero-azul">12</span> cuotas de <span class="cuota-highlight">' + redondea(cuota1) + ' €</span> <small style="color: var(--text-secondary); display: block;">(1er año sin intereses)</small>' +
 			                'y <span class="cuota-numero-azul">12</span> cuotas de <span class="cuota-highlight">' + redondea(cuota2) + ' €</span> <small style="color: var(--text-secondary); display: block; margin-bottom: 6px;">(2º año con intereses)</small>';
 		} else {
-			pmt24 = calcula(pv, rate24, 24, fv);
-			totalPagar24 = (pmt24 * 24) + fv;
-			intereses24 = totalPagar24 - pv;	
+			pmt24 = calcula(num_pv, rate24, 24, num_fv);
+			totalPagar24 = (pmt24 * 24) + num_fv;
+			intereses24 = totalPagar24 - num_pv;	
 			textoCuotas24 = '<span class="cuota-numero-azul">24</span> cuotas de <span class="cuota-highlight">' + redondea(pmt24) + ' €</span>';
 		}
 
 		// --- 36 meses ---
 		let bloque36HTML = '';
-		if (fv2 && fv2 > 0) {
-			let rate36 = TIN36/100/12; 
-			let pmt36 = calcula(pv, rate36, 36, fv2);
-			let totalPagar36 = (pmt36 * 36) + fv2;
-			let intereses36 = totalPagar36 - pv;
+		if (num_fv2 && num_fv2 > 0) {
+			let rate36 = (TIN36 / 100) / 12; 
+			let pmt36 = calcula(num_pv, rate36, 36, num_fv2);
+			let totalPagar36 = (pmt36 * 36) + num_fv2;
+			let intereses36 = totalPagar36 - num_pv;
 			let textoCuotas36 = '<span class="cuota-numero-azul">36</span> cuotas de <span class="cuota-highlight">' + redondea(pmt36) + ' €</span>';
 
 			bloque36HTML += '<hr>';
 			bloque36HTML += '<div class="cuota-bloque">' + textoCuotas36 + '</div>';
-			bloque36HTML += '<div class="linea-unificada">Última cuota final de <b>' + redondea(fv2) + ' €</b></div>';
+			bloque36HTML += '<div class="linea-unificada">Última cuota final de <b>' + redondea(num_fv2) + ' €</b></div>';
 			bloque36HTML += '<div class="linea-unificada">Importe total a pagar: <span class="total-verde">' + redondea(totalPagar36) + ' €</span></div>';
 			bloque36HTML += '<div class="linea-unificada">Intereses devengados: <span class="interes-rojo">' + redondea(intereses36) + ' €</span></div>';
 		} else {
@@ -555,14 +563,14 @@
 			bloque36HTML += '</div>';
 		}
 
-		let codigo_enlace = '<a class="precio-enlace" title="Haz clic para modificar el precio" href="#" onclick="abrirModalPrecio();return false;">' + pv + ' €</a>';	  
+		let codigo_enlace = '<a class="precio-enlace" title="Haz clic para modificar el precio" href="#" onclick="abrirModalPrecio();return false;">' + num_pv + ' €</a>';	  
 		
 		let HTML_final = '<div class="resultado-card">';
 		HTML_final += '<h3>Cálculo Financiación</h3>';
 		HTML_final += '<span class="titulo-importe-base">Importe a Financiar:</span> ' + codigo_enlace + '<br><hr>';
 		
 		HTML_final += '<div class="cuota-bloque">' + textoCuotas24 + '</div>';
-		HTML_final += '<div class="linea-unificada">Última cuota final de <b>' + redondea(fv) + ' €</b></div>';
+		HTML_final += '<div class="linea-unificada">Última cuota final de <b>' + redondea(num_fv) + ' €</b></div>';
 		HTML_final += '<div class="linea-unificada">Importe total a pagar: <span class="total-verde">' + redondea(totalPagar24) + ' €</span></div>';
 		HTML_final += '<div class="linea-unificada">Intereses devengados: <span class="interes-rojo">' + redondea(intereses24) + ' €</span>' + (exentoPrimerAnio ? ' <small style="color:var(--text-secondary)">(1er año exento)</small>' : '') + '</div>';
 		
