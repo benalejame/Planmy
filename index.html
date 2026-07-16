@@ -520,14 +520,17 @@
 		let pmt24, intereses24, textoCuotas24, totalPagar24;
 
 		if (exentoPrimerAnio) {
-			// 1. Amortización lineal estricta para el primer año
+			// 1. Amortización puramente lineal libre de intereses los primeros 12 meses
 			let cuota1 = (num_pv - num_fv) / 24;
 			
-			// 2. Saldo vivo al inicio del mes 13 (Año 2)
+			// 2. Saldo deudor al comienzo del mes 13 (Año 2)
 			let saldoFinAnio1 = num_pv - (cuota1 * 12);
 			
-			// 3. Amortización del Año 2 con tipo francés sobre el total del capital vivo restante (incluido el VR)
-			let cuota2 = (rate24 * saldoFinAnio1) / (1 - Math.pow(1 + rate24, -12));
+			// 3. Sistema francés SOLO para la mitad del capital que se sigue amortizando
+			let capitalAmortizableAño2 = saldoFinAnio1 - num_fv;
+			
+			// 4. Sumatorio exacto: Francesa limpia del capital + Interés plano mensual generado por el VR apartado
+			let cuota2 = (rate24 * capitalAmortizableAño2) / (1 - Math.pow(1 + rate24, -12)) + (num_fv * rate24);
 
 			pmt24 = cuota2;
 			totalPagar24 = (cuota1 * 12) + (cuota2 * 12) + num_fv;
