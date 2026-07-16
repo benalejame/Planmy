@@ -508,8 +508,7 @@
 		let cuotaPrimerAnio = (pv - fv) / nper;
 		let saldoFinAnio1 = pv - (cuotaPrimerAnio * 12);
 		
-		let factorInteres = Math.pow(1 + rate, 12);
-		let cuotaSiguientesAnios = (rate * (saldoFinAnio1 - fv / factorInteres)) / (1 - Math.pow(1 + rate, -12));
+		let cuotaSiguientesAnios = (rate * (saldoFinAnio1 - fv / Math.pow(1 + rate, 12))) / (1 - Math.pow(1 + rate, -12));
 		
 		return { cuota1: cuotaPrimerAnio, cuota2: cuotaSiguientesAnios };
 	}
