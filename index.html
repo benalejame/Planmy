@@ -4,6 +4,9 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta charset="UTF-8">
 		<title>Simulador PlanMy iPhone</title>
+		<!-- Vinculación del Favicon en la raíz del proyecto -->
+		<link rel="icon" type="image/png" href="favicon.png">
+		
 		<style type="text/css" media="print">
 				body {visibility: hidden; display: none;}
 		</style>
@@ -43,7 +46,7 @@
 	
 	#cuerpo {
 		width: 96%;
-		max-width: 600px; /* Limitamos el ancho en escritorio para mantener la estética vertical limpia */
+		max-width: 600px;
 		margin: 15px auto;
 		padding: 20px 25px;
 		background: var(--bg-card);
@@ -61,7 +64,6 @@
 		letter-spacing: -0.5px;
 	}
 
-	/* Modificado a bloque vertical puro tanto en móvil como en escritorio */
 	.simulador-grid {
 		display: flex;
 		flex-direction: column;
@@ -277,9 +279,6 @@
 	.modal-btn-confirm { background: var(--accent); color: #ffffff; }
 	.modal-btn-confirm:hover { background: var(--accent-hover); }
 
-	@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-	@keyframes scaleUp { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
 	@media only screen and (max-width: 900px) {	
 		#cuerpo { margin: 5px auto; padding: 12px; border-radius: 0; width: 100%; }
 	}
@@ -461,10 +460,11 @@
 		});
 	}
 
+	// Admite valores flotantes para preservar centavos
 	function abrirModalPrecio() {
 		const modal = document.getElementById("custom-price-modal");
 		const input = document.getElementById("modal-price-input");
-		input.value = ultimo_pv.toFixed(2); // Se abre mostrando dos decimales
+		input.value = ultimo_pv.toFixed(2);
 		modal.style.display = "flex";
 		input.focus();
 		input.select();
@@ -476,7 +476,7 @@
 
 	function confirmarNuevoPrecio() {
 		const input = document.getElementById("modal-price-input");
-		let nuevo_pv = parseFloat(input.value); // Cambiado a parseFloat para admitir decimales
+		let nuevo_pv = parseFloat(input.value);
 		if (nuevo_pv != null && !isNaN(nuevo_pv) && nuevo_pv > 0) {
 			ultimo_pv = nuevo_pv;
 			dibujaCuota(nuevo_pv, VR, VR2);
@@ -536,9 +536,15 @@
 		
 		let intereses24 = (pmt24 * 24) + fv - pv;
 		let totalPagar24 = ((pmt24 - desctoEfectivo) * 24) + fv;
-		let totalAhorrado24 = totalPagar24 - pv; // Métrica de total ahorrado
 
 		let textoCuotas24 = '<span class="cuota-numero-azul">24</span> cuotas de <span class="cuota-highlight">' + formatearImporte(pmt24 - desctoEfectivo) + ' €</span>' + (desctoEfectivo > 0 ? ' <small style="color: var(--text-secondary); display: block;">(Con bonificación mensual aplicada)</small>' : '');
+
+		// Renderizado condicional de la línea de ahorro (Solo si el total es menor al capital inicial financiado)
+		let lineaAhorroHTML = '';
+		if (totalPagar24 < pv) {
+			let totalAhorrado24 = pv - totalPagar24; // Representado estrictamente en valor absoluto positivo
+			lineaAhorroHTML = '<div class="linea-unificada">Total ahorrado: <span class="ahorro-morado">' + formatearImporte(totalAhorrado24) + ' €</span></div>';
+		}
 
 		// --- 36 meses ---
 		let bloque36HTML = '';
@@ -571,7 +577,7 @@
 		HTML_final += '<div class="linea-unificada">Última cuota final de <b>' + formatearImporte(fv) + ' €</b></div>';
 		HTML_final += '<div class="linea-unificada">Importe total a pagar: <span class="total-verde">' + formatearImporte(totalPagar24) + ' €</span></div>';
 		HTML_final += '<div class="linea-unificada">Intereses devengados: <span class="interes-rojo">' + formatearImporte(intereses24) + ' €</span></div>';
-		HTML_final += '<div class="linea-unificada">Total ahorrado: <span class="ahorro-morado">' + formatearImporte(totalAhorrado24) + ' €</span></div>'; // Línea morada añadida
+		HTML_final += lineaAhorroHTML; // Se inyecta aquí condicionalmente
 		
 		HTML_final += bloque36HTML;
 		HTML_final += '</div>';
@@ -580,7 +586,6 @@
 		txt_resultado.innerHTML = HTML_final;
 	}
 
-	// Forzado estricto y seguro de representación con dos posiciones decimales
 	function formatearImporte(valor) {
 		if (Number.EPSILON === undefined) Number.EPSILON = Math.pow(2, -52);
 		let valorRedondeado = Math.round((valor + Number.EPSILON) * 100) / 100;
@@ -614,7 +619,6 @@
 				</div>
 			</div>
 
-			<!-- Rejilla estructurada en dirección vertical única -->
 			<div class="simulador-grid" id="workspace" style="display: none;">
 				<div class="col-izquierda">
 					<div class="section-card">
@@ -655,7 +659,7 @@
 			</div>
 		</div>
 
-		<!-- CUADRO DE DIÁLOGO MODAL PERSONALIZADO (POPUP) ADMITE DOS DECIMALES -->
+		<!-- CUADRO DE DIÁLOGO MODAL PERSONALIZADO -->
 		<div id="custom-price-modal" class="modal-overlay" onclick="cerrarModalPrecio()">
 			<div class="modal-box" onclick="event.stopPropagation()">
 				<h4>Introduce el nuevo PVP</h4>
