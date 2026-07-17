@@ -171,7 +171,7 @@
 		letter-spacing: 0.5px;
 	}
 
-	/* --- CHECKBOX & INPUTS --- */
+	/* --- CHECKBOX & SELECTORES --- */
 	.control-checkbox {
 		display: flex;
 		align-items: center;
@@ -184,30 +184,6 @@
 	}
 	.control-checkbox label { display: flex; align-items: center; cursor: pointer; width: 100%; user-select: none; }
 	.control-checkbox input[type="checkbox"] { width: 16px; height: 16px; margin-right: 8px; accent-color: var(--accent); }
-
-	.input-compras-container {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		background: #f5f5f7;
-		padding: 12px 14px;
-		border-radius: var(--radius-md);
-		font-size: 0.9rem;
-		color: var(--text-primary);
-		border: 1px solid var(--border-color);
-	}
-	.input-compras-container label { font-weight: 500; color: var(--text-primary); }
-	.input-compras {
-		width: 100%;
-		padding: 8px 10px;
-		font-size: 0.95rem;
-		border: 1px solid var(--border-color);
-		border-radius: var(--radius-sm);
-		box-sizing: border-box;
-		outline: none;
-		background: var(--bg-card);
-	}
-	.input-compras:focus { border-color: var(--accent); }
 
 	/* --- TARJETA DE RESULTADOS --- */
 	.resultado-card {
@@ -330,6 +306,7 @@
 	let VR = 0;
 	let VR2 = 0;
 	let ultimo_pv = 0;
+	let bonificacionSeleccionada = 0; // Guarda el valor del descuento activo (10, 20, 30 o 0)
 
 	// CARGA AUTOMÁTICA MEDIANTE FETCH DE LA RAÍZ DEL PROYECTO
 	function cargarCSVDirecto() {
@@ -470,7 +447,7 @@
 			containerExencion.style.display = "none";
 			checkboxExencion.checked = false;
 			containerCompras.style.display = "none";
-			document.getElementById("importe-compras").value = "";
+			resetearBotonesBonif();
 		}
 
 		const ramaCapacidades = datos_completos[modelo];
@@ -527,7 +504,6 @@
 		}
 	}
 
-	// Función de desplazamiento suave al fondo
 	function desplazarAbajo() {
 		setTimeout(() => {
 			window.scrollTo({
@@ -551,23 +527,37 @@
 		return { cuota1: cuotaPrimerAnio, cuota2: cuotaSiguientesAnios };
 	}
 
+	// Gestiona la pulsación de los botones de rango de bonificación
+	function seleccionarBonificacion(valorDescuento, elementoBoton) {
+		const estabaSeleccionado = elementoBoton.classList.contains("selected");
+		
+		resetearBotonesBonif();
+
+		if (!estabaSeleccionado) {
+			elementoBoton.classList.add("selected");
+			bonificacionSeleccionada = valorDescuento;
+		} else {
+			bonificacionSeleccionada = 0;
+		}
+
+		if (ultimo_pv > 0) {
+			dibujaCuota(ultimo_pv, VR, VR2);
+			desplazarAbajo();
+		}
+	}
+
+	function resetearBotonesBonif() {
+		document.querySelectorAll(".bonif-btn").forEach(b => b.classList.remove("selected"));
+		bonificacionSeleccionada = 0;
+	}
+
 	function dibujaCuota(pv, fv, fv2) {	
 		const TIN24 = 10.57;
 		const TIN36 = 11.42;
 		const exentoPrimerAnio = document.getElementById('soloSegundoAnio').checked;
 
-		// --- BONIFICACIÓN POR COMPRAS ---
-		let bonificacionMensual = 0;
-		if (exentoPrimerAnio) {
-			const comprasVal = parseFloat(document.getElementById("importe-compras").value) || 0;
-			if (comprasVal > 650) {
-				bonificacionMensual = 30;
-			} else if (comprasVal > 325) {
-				bonificacionMensual = 20;
-			} else if (comprasVal > 125) {
-				bonificacionMensual = 10;
-			}
-		}
+		// Si no está exento el primer año, la bonificación de compras no aplica
+		let desctoEfectivo = exentoPrimerAnio ? bonificacionSeleccionada : 0;
 
 		// --- 24 meses ---
 		let rate24 = TIN24/100/12; 
@@ -577,14 +567,14 @@
 			let plan24 = calculaCarenciaPrimerAnio(pv, rate24, 24, fv);
 			pmt24 = plan24.cuota2;
 			
-			// Los intereses devengados se calculan sobre las cuotas originales (sin descontar la bonificación)
+			// Intereses calculados sobre la cuota financiera base pura (Post-interés, antes de bonificaciones)
 			intereses24 = (plan24.cuota1 * 12) + (plan24.cuota2 * 12) + fv - pv;
 			
-			// El total a pagar sí refleja el ahorro de la bonificación de compras
-			totalPagar24 = ((plan24.cuota1 - bonificacionMensual) * 12) + ((plan24.cuota2 - bonificacionMensual) * 12) + fv;
+			// El importe total a pagar sí descuenta la bonificación aplicada
+			totalPagar24 = ((plan24.cuota1 - desctoEfectivo) * 12) + ((plan24.cuota2 - desctoEfectivo) * 12) + fv;
 			
-			textoCuotas24 = '<span class="cuota-numero-azul">12</span> cuotas de <span class="cuota-highlight">' + redondea(plan24.cuota1 - bonificacionMensual) + ' €</span> <small style="color: var(--text-secondary); display: block;">(1er año sin intereses' + (bonificacionMensual > 0 ? ' y con bonif.' : '') + ')</small>' +
-			                'y <span class="cuota-numero-azul">12</span> cuotas de <span class="cuota-highlight">' + redondea(plan24.cuota2 - bonificacionMensual) + ' €</span> <small style="color: var(--text-secondary); display: block; margin-bottom: 6px;">(2º año con intereses' + (bonificacionMensual > 0 ? ' y con bonif.' : '') + ')</small>';
+			textoCuotas24 = '<span class="cuota-numero-azul">12</span> cuotas de <span class="cuota-highlight">' + redondea(plan24.cuota1 - desctoEfectivo) + ' €</span> <small style="color: var(--text-secondary); display: block;">(1er año sin intereses' + (desctoEfectivo > 0 ? ' y con bonif.' : '') + ')</small>' +
+			                'y <span class="cuota-numero-azul">12</span> cuotas de <span class="cuota-highlight">' + redondea(plan24.cuota2 - desctoEfectivo) + ' €</span> <small style="color: var(--text-secondary); display: block; margin-bottom: 6px;">(2º año con intereses' + (desctoEfectivo > 0 ? ' y con bonif.' : '') + ')</small>';
 		} else {
 			pmt24 = calcula(pv, rate24, 24, fv);
 			totalPagar24 = (pmt24 * 24) + fv;
@@ -650,22 +640,15 @@
 		document.getElementById('soloSegundoAnio').addEventListener('change', (e) => {
 			const containerCompras = document.getElementById("compras-container");
 			if (e.target.checked) {
-				containerCompras.style.display = "flex";
+				containerCompras.style.display = "block";
 			} else {
 				containerCompras.style.display = "none";
-				document.getElementById("importe-compras").value = "";
+				resetearBotonesBonif();
 			}
 			
 			if (ultimo_pv > 0) {
 				dibujaCuota(ultimo_pv, VR, VR2);
 				desplazarAbajo();
-			}
-		});
-
-		// Evento al escribir en el campo de compras mensuales
-		document.getElementById('importe-compras').addEventListener('input', () => {
-			if (ultimo_pv > 0) {
-				dibujaCuota(ultimo_pv, VR, VR2);
 			}
 		});
 		
@@ -704,9 +687,14 @@
 						</label>
 					</div>
 
-					<div id="compras-container" class="input-compras-container" style="display: none;">
-						<label for="importe-compras">Importe mensual de compras (€):</label>
-						<input type="number" id="importe-compras" class="input-compras" placeholder="Introduce el gasto en tienda" min="0">
+					<!-- SELECTOR DE RANGOS DE COMPRA MEDIANTE BOTONES PILL -->
+					<div id="compras-container" class="section-card" style="display: none;">
+						<div class="section-title">Volumen de compras mensuales</div>
+						<div class="button-grid">
+							<button class="pill-btn bonif-btn" onclick="seleccionarBonificacion(10, this)">> 125 € (-10 €/mes)</button>
+							<button class="pill-btn bonif-btn" onclick="seleccionarBonificacion(20, this)">> 325 € (-20 €/mes)</button>
+							<button class="pill-btn bonif-btn" onclick="seleccionarBonificacion(30, this)">> 650 € (-30 €/mes)</button>
+						</div>
 					</div>
 				</div>
 
