@@ -27,6 +27,7 @@
 		
 		--green-total: #34c759;
 		--red-interest: #ff3b30;
+		--purple-savings: #af40ff;
 	}
 
 	body {
@@ -42,7 +43,7 @@
 	
 	#cuerpo {
 		width: 96%;
-		max-width: 100%;
+		max-width: 600px; /* Limitamos el ancho en escritorio para mantener la estética vertical limpia */
 		margin: 15px auto;
 		padding: 20px 25px;
 		background: var(--bg-card);
@@ -60,22 +61,18 @@
 		letter-spacing: -0.5px;
 	}
 
+	/* Modificado a bloque vertical puro tanto en móvil como en escritorio */
 	.simulador-grid {
-		display: grid;
-		grid-template-columns: 1.2fr 1fr;
-		gap: 25px;
-		align-items: start;
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
 	}
 
 	.col-izquierda, .col-derecha {
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
-	}
-
-	.col-derecha {
-		position: sticky;
-		top: 15px;
+		width: 100%;
 	}
 
 	hr {
@@ -179,6 +176,7 @@
 		box-shadow: var(--shadow-subtle);
 		text-align: center;
 		border: 1px solid #e8e8ed;
+		margin-top: 5px;
 	}
 
 	.resultado-card h3 { margin-top: 0; font-size: 0.95rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 12px; }
@@ -217,6 +215,11 @@
 		font-weight: 700;
 	}
 
+	.ahorro-morado {
+		color: var(--purple-savings);
+		font-weight: 700;
+	}
+
 	.placeholder-resultado {
 		border: 2px dashed var(--border-color);
 		border-radius: var(--radius-md);
@@ -224,9 +227,10 @@
 		text-align: center;
 		color: var(--text-secondary);
 		font-size: 0.95rem;
+		margin-top: 5px;
 	}
 
-	.aviso-footer { grid-column: 1 / -1; text-align: center; color: var(--text-secondary); font-size: 0.8rem; margin-top: 15px; }
+	.aviso-footer { text-align: center; color: var(--text-secondary); font-size: 0.8rem; margin-top: 15px; width: 100%; }
 	
 	.firma-autor {
 		font-size: 0.75rem;
@@ -277,9 +281,7 @@
 	@keyframes scaleUp { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 	@media only screen and (max-width: 900px) {	
-		#cuerpo { margin: 5px 0; padding: 12px; border-radius: 0; }
-		.simulador-grid { grid-template-columns: 1fr; gap: 15px; }
-		.col-derecha { position: static; }
+		#cuerpo { margin: 5px auto; padding: 12px; border-radius: 0; width: 100%; }
 	}
 </style>
 
@@ -361,7 +363,7 @@
 		familias["Familia iPhone 16 & Anteriores"] = [...new Set(familias["Familia iPhone 16 & Anteriores"])];
 
 		document.getElementById("upload-container").style.display = "none";
-		document.getElementById("workspace").style.display = "grid";
+		document.getElementById("workspace").style.display = "flex";
 		construirFamilias();
 	}
 
@@ -462,7 +464,7 @@
 	function abrirModalPrecio() {
 		const modal = document.getElementById("custom-price-modal");
 		const input = document.getElementById("modal-price-input");
-		input.value = ultimo_pv;
+		input.value = ultimo_pv.toFixed(2); // Se abre mostrando dos decimales
 		modal.style.display = "flex";
 		input.focus();
 		input.select();
@@ -474,7 +476,7 @@
 
 	function confirmarNuevoPrecio() {
 		const input = document.getElementById("modal-price-input");
-		let nuevo_pv = parseInt(input.value);
+		let nuevo_pv = parseFloat(input.value); // Cambiado a parseFloat para admitir decimales
 		if (nuevo_pv != null && !isNaN(nuevo_pv) && nuevo_pv > 0) {
 			ultimo_pv = nuevo_pv;
 			dibujaCuota(nuevo_pv, VR, VR2);
@@ -525,7 +527,6 @@
 		const TIN24 = 10.57;
 		const TIN36 = 11.42;
 
-		// La bonificación solo aplica si el contenedor está visible en pantalla (iPhone 17 / Air)
 		const containerComprasVisible = document.getElementById("compras-container").style.display === "block";
 		let desctoEfectivo = containerComprasVisible ? bonificacionSeleccionada : 0;
 
@@ -533,13 +534,11 @@
 		let rate24 = TIN24/100/12; 
 		let pmt24 = calcula(pv, rate24, 24, fv);
 		
-		// Intereses puros sobre la operación financiera original
 		let intereses24 = (pmt24 * 24) + fv - pv;
-		
-		// El total neto a pagar deduce la bonificación mensual comercial
 		let totalPagar24 = ((pmt24 - desctoEfectivo) * 24) + fv;
-		
-		let textoCuotas24 = '<span class="cuota-numero-azul">24</span> cuotas de <span class="cuota-highlight">' + redondea(pmt24 - desctoEfectivo) + ' €</span>' + (desctoEfectivo > 0 ? ' <small style="color: var(--text-secondary); display: block;">(Con bonificación mensual aplicada)</small>' : '');
+		let totalAhorrado24 = totalPagar24 - pv; // Métrica de total ahorrado
+
+		let textoCuotas24 = '<span class="cuota-numero-azul">24</span> cuotas de <span class="cuota-highlight">' + formatearImporte(pmt24 - desctoEfectivo) + ' €</span>' + (desctoEfectivo > 0 ? ' <small style="color: var(--text-secondary); display: block;">(Con bonificación mensual aplicada)</small>' : '');
 
 		// --- 36 meses ---
 		let bloque36HTML = '';
@@ -548,13 +547,13 @@
 			let pmt36 = calcula(pv, rate36, 36, fv2);
 			let totalPagar36 = (pmt36 * 36) + fv2;
 			let intereses36 = totalPagar36 - pv;
-			let textoCuotas36 = '<span class="cuota-numero-azul">36</span> cuotas de <span class="cuota-highlight">' + redondea(pmt36) + ' €</span>';
+			let textoCuotas36 = '<span class="cuota-numero-azul">36</span> cuotas de <span class="cuota-highlight">' + formatearImporte(pmt36) + ' €</span>';
 
 			bloque36HTML += '<hr>';
 			bloque36HTML += '<div class="cuota-bloque">' + textoCuotas36 + '</div>';
-			bloque36HTML += '<div class="linea-unificada">Última cuota final de <b>' + redondea(fv2) + ' €</b></div>';
-			bloque36HTML += '<div class="linea-unificada">Importe total a pagar: <span class="total-verde">' + redondea(totalPagar36) + ' €</span></div>';
-			bloque36HTML += '<div class="linea-unificada">Intereses devengados: <span class="interes-rojo">' + redondea(intereses36) + ' €</span></div>';
+			bloque36HTML += '<div class="linea-unificada">Última cuota final de <b>' + formatearImporte(fv2) + ' €</b></div>';
+			bloque36HTML += '<div class="linea-unificada">Importe total a pagar: <span class="total-verde">' + formatearImporte(totalPagar36) + ' €</span></div>';
+			bloque36HTML += '<div class="linea-unificada">Intereses devengados: <span class="interes-rojo">' + formatearImporte(intereses36) + ' €</span></div>';
 		} else {
 			bloque36HTML += '<hr>';
 			bloque36HTML += '<div style="color: var(--text-secondary); font-size: 0.95rem; font-style: italic; padding: 10px 0;">';
@@ -562,16 +561,17 @@
 			bloque36HTML += '</div>';
 		}
 
-		let codigo_enlace = '<a class="precio-enlace" title="Haz clic para modificar el precio" href="#" onclick="abrirModalPrecio();return false;">' + pv + ' €</a>';	  
+		let codigo_enlace = '<a class="precio-enlace" title="Haz clic para modificar el precio" href="#" onclick="abrirModalPrecio();return false;">' + formatearImporte(pv) + ' €</a>';	  
 		
 		let HTML_final = '<div class="resultado-card">';
 		HTML_final += '<h3>Cálculo Financiación</h3>';
 		HTML_final += '<span class="titulo-importe-base">Importe a Financiar:</span> ' + codigo_enlace + '<br><hr>';
 		
 		HTML_final += '<div class="cuota-bloque">' + textoCuotas24 + '</div>';
-		HTML_final += '<div class="linea-unificada">Última cuota final de <b>' + redondea(fv) + ' €</b></div>';
-		HTML_final += '<div class="linea-unificada">Importe total a pagar: <span class="total-verde">' + redondea(totalPagar24) + ' €</span></div>';
-		HTML_final += '<div class="linea-unificada">Intereses devengados: <span class="interes-rojo">' + redondea(intereses24) + ' €</span></div>';
+		HTML_final += '<div class="linea-unificada">Última cuota final de <b>' + formatearImporte(fv) + ' €</b></div>';
+		HTML_final += '<div class="linea-unificada">Importe total a pagar: <span class="total-verde">' + formatearImporte(totalPagar24) + ' €</span></div>';
+		HTML_final += '<div class="linea-unificada">Intereses devengados: <span class="interes-rojo">' + formatearImporte(intereses24) + ' €</span></div>';
+		HTML_final += '<div class="linea-unificada">Total ahorrado: <span class="ahorro-morado">' + formatearImporte(totalAhorrado24) + ' €</span></div>'; // Línea morada añadida
 		
 		HTML_final += bloque36HTML;
 		HTML_final += '</div>';
@@ -580,9 +580,11 @@
 		txt_resultado.innerHTML = HTML_final;
 	}
 
-	function redondea(valor){
+	// Forzado estricto y seguro de representación con dos posiciones decimales
+	function formatearImporte(valor) {
 		if (Number.EPSILON === undefined) Number.EPSILON = Math.pow(2, -52);
-		return (Math.round((valor + Number.EPSILON) * 100) / 100);
+		let valorRedondeado = Math.round((valor + Number.EPSILON) * 100) / 100;
+		return valorRedondeado.toFixed(2);
 	}
 
 	function actualizarFirmaFechas() {
@@ -612,6 +614,7 @@
 				</div>
 			</div>
 
+			<!-- Rejilla estructurada en dirección vertical única -->
 			<div class="simulador-grid" id="workspace" style="display: none;">
 				<div class="col-izquierda">
 					<div class="section-card">
@@ -652,11 +655,11 @@
 			</div>
 		</div>
 
-		<!-- CUADRO DE DIÁLOGO MODAL PERSONALIZADO (POPUP) -->
+		<!-- CUADRO DE DIÁLOGO MODAL PERSONALIZADO (POPUP) ADMITE DOS DECIMALES -->
 		<div id="custom-price-modal" class="modal-overlay" onclick="cerrarModalPrecio()">
 			<div class="modal-box" onclick="event.stopPropagation()">
 				<h4>Introduce el nuevo PVP</h4>
-				<input type="number" id="modal-price-input" class="modal-input" placeholder="Importe en €" min="1">
+				<input type="number" id="modal-price-input" class="modal-input" placeholder="Importe en €" min="0.01" step="0.01">
 				<div class="modal-buttons">
 					<button class="modal-btn modal-btn-cancel" onclick="cerrarModalPrecio()">Cancelar</button>
 					<button class="modal-btn modal-btn-confirm" onclick="confirmarNuevoPrecio()">Aplicar</button>
