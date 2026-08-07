@@ -1,12 +1,12 @@
 ﻿<!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta charset="UTF-8">
 		<title>Simulador PlanMy iPhone</title>
 		
-		<!-- Vinculación del Favicon corregida para forzar lectura de archivo PNG -->
-		<link rel="shortcut icon" type="image/png" href="./favicon.png?v=2">
+		<!-- Vinculación del Favicon -->
+		<link rel="shortcut icon" type="image/png" href="favicon.png">
 		
 		<style type="text/css" media="print">
 				body {visibility: hidden; display: none;}
@@ -85,7 +85,7 @@
 		margin: 8px 0;
 	}
 
-	/* --- ESTADO CARGANDO --- */
+	/* --- ESTADO CARGANDO Y SEGURIDAD --- */
 	.loading-card {
 		background: #f5f5f7;
 		padding: 30px;
@@ -94,6 +94,28 @@
 		font-size: 1.1rem;
 		color: var(--text-secondary);
 		border: 1px solid var(--border-color);
+	}
+
+	.security-bar {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		font-size: 0.8rem;
+		color: var(--text-secondary);
+		padding: 6px 12px;
+		background: #f1f1f4;
+		border-radius: var(--radius-sm);
+		margin-bottom: 12px;
+	}
+
+	.btn-link-danger {
+		background: none;
+		border: none;
+		color: var(--red-interest);
+		font-size: 0.8rem;
+		cursor: pointer;
+		text-decoration: underline;
+		padding: 0;
 	}
 
 	/* --- ACORDEONES Y BOTONES ULTRA COMPACTOS --- */
@@ -242,7 +264,7 @@
 		display: block;
 	}
 
-	/* --- VENTANA MODAL --- */
+	/* --- VENTANAS MODALES --- */
 	.modal-overlay {
 		position: fixed;
 		top: 0;
@@ -280,12 +302,22 @@
 	.modal-btn-confirm { background: var(--accent); color: #ffffff; }
 	.modal-btn-confirm:hover { background: var(--accent-hover); }
 
+	.error-msg {
+		color: var(--red-interest);
+		font-size: 0.85rem;
+		margin-bottom: 12px;
+		display: none;
+	}
+
 	@media only screen and (max-width: 900px) {	
 		#cuerpo { margin: 5px auto; padding: 12px; border-radius: 0; width: 100%; }
 	}
 </style>
 
 <script>
+	const LOCAL_STORAGE_KEY = "planmy_app_password";
+	const ARCHIVO_CIFRADO = "PVP y RV.enc";
+
 	let datos_completos = {};
 	let familias = {};
 
@@ -295,28 +327,137 @@
 	let VR2 = 0;
 	let ultimo_pv = 0;
 	let bonificacionSeleccionada = 0;
+	let bufferEncryptedData = null;
 
-	// CARGA AUTOMÁTICA MEDIANTE FETCH DE LA RAÍZ DEL PROYECTO
-	function cargarCSVDirecto() {
-		fetch('PVP y RV.csv')
-			.then(response => {
-				if (!response.ok) {
-					throw new Error("No se pudo encontrar el archivo 'PVP y RV.csv' en la raíz.");
-				}
-				return response.text();
-			})
-			.then(contents => {
-				procesarContenidoCSV(contents);
-			})
-			.catch(error => {
-				console.error(error);
-				document.getElementById("loading-message").innerHTML = 
-					"<span style='color:var(--red-interest); font-weight:600;'>Error al cargar las tarifas automáticamente.</span><br>" +
-					"Asegúrate de tener el archivo <b>PVP y RV.csv</b> ubicado en la misma carpeta raíz que este HTML.";
-			});
+	// DESCIFRADO MEDIANTE WEB CRYPTO API (AES-GCM + PBKDF2)
+	async function descifrarDatos(arrayBuffer, password) {
+		const enc = new TextEncoder();
+		const data = new Uint8Array(arrayBuffer);
+
+		// Estructura del .enc: Salt (16 B) + IV (12 B) + Ciphertext
+		const salt = data.slice(0, 16);
+		const iv = data.slice(16, 28);
+		const ciphertext = data.slice(28);
+
+		const passwordKey = await window.crypto.subtle.importKey(
+			"raw",
+			enc.encode(password),
+			{ name: "PBKDF2" },
+			false,
+			["deriveKey"]
+		);
+
+		const key = await window.crypto.subtle.deriveKey(
+			{
+				name: "PBKDF2",
+				salt: salt,
+				iterations: 100000,
+				hash: "SHA-256"
+			},
+			passwordKey,
+			{ name: "AES-GCM", length: 256 },
+			false,
+			["decrypt"]
+		);
+
+		const decryptedContent = await window.crypto.subtle.decrypt(
+			{ name: "AES-GCM", iv: iv },
+			key,
+			ciphertext
+		);
+
+		const dec = new TextDecoder();
+		return dec.decode(decryptedContent);
 	}
 
-	// PROCESADO DEL TEXTO DEL CSV
+	// CARGA DEL ARCHIVO CIFRADO
+	async function iniciarCargaApp() {
+		try {
+			const response = await fetch(ARCHIVO_CIFRADO);
+			if (!response.ok) {
+				throw new Error(`No se pudo cargar el archivo '${ARCHIVO_CIFRADO}'.`);
+			}
+			bufferEncryptedData = await response.arrayBuffer();
+
+			// Verificar si hay contraseña guardada en LocalStorage
+			const passGuardada = localStorage.getItem(LOCAL_STORAGE_KEY);
+			if (passGuardada) {
+				intentarDescifrado(passGuardada, true);
+			} else {
+				pedirContrasenaModal();
+			}
+		} catch (error) {
+			console.error(error);
+			document.getElementById("loading-message").innerHTML = 
+				"<span style='color:var(--red-interest); font-weight:600;'>Error al cargar los datos cifrados.</span><br>" +
+				`Asegúrate de que el archivo <b>${ARCHIVO_CIFRADO}</b> está presente en la raíz.`;
+		}
+	}
+
+	async function intentarDescifrado(password, esAutoGuardado = false) {
+		try {
+			const csvTexto = await descifrarDatos(bufferEncryptedData, password);
+			
+			// Guardar contraseña válida
+			localStorage.setItem(LOCAL_STORAGE_KEY, password);
+			cerrarModalPassword();
+			
+			procesarContenidoCSV(csvTexto);
+		} catch (e) {
+			console.warn("Fallo de descifrado:", e);
+			localStorage.removeItem(LOCAL_STORAGE_KEY);
+			
+			if (esAutoGuardado) {
+				pedirContrasenaModal("La contraseña guardada ha caducado o es incorrecta.");
+			} else {
+				mostrarErrorPassword("Contraseña incorrecta. Vuelve a intentarlo.");
+			}
+		}
+	}
+
+	function pedirContrasenaModal(mensajeError = "") {
+		const modal = document.getElementById("password-modal");
+		const input = document.getElementById("modal-pass-input");
+		const errDiv = document.getElementById("pass-error-msg");
+		
+		input.value = "";
+		if (mensajeError) {
+			errDiv.textContent = mensajeError;
+			errDiv.style.display = "block";
+		} else {
+			errDiv.style.display = "none";
+		}
+
+		modal.style.display = "flex";
+		input.focus();
+	}
+
+	function cerrarModalPassword() {
+		document.getElementById("password-modal").style.display = "none";
+	}
+
+	function confirmarPasswordModal() {
+		const input = document.getElementById("modal-pass-input");
+		const password = input.value.trim();
+		if (password) {
+			intentarDescifrado(password, false);
+		} else {
+			mostrarErrorPassword("Introduce una contraseña válida.");
+		}
+	}
+
+	function mostrarErrorPassword(txt) {
+		const errDiv = document.getElementById("pass-error-msg");
+		errDiv.textContent = txt;
+		errDiv.style.display = "block";
+	}
+
+	function borrarContrasenaGuardada() {
+		localStorage.removeItem(LOCAL_STORAGE_KEY);
+		location.reload();
+	}
+
+	// PROCESADO DEL TEXTO DESCIFRADO DEL CSV
 	function procesarContenidoCSV(contents) {
 		const lineas = contents.split(/\r?\n/);
 		
@@ -538,10 +679,9 @@
 
 		let textoCuotas24 = '<span class="cuota-numero-azul">24</span> cuotas de <span class="cuota-highlight">' + formatearImporte(pmt24 - desctoEfectivo) + ' €</span>' + (desctoEfectivo > 0 ? ' <small style="color: var(--text-secondary); display: block;">(Con bonificación mensual aplicada)</small>' : '');
 
-		// Lógica condicional: Solo si el total a pagar es menor al capital inicial financiado
 		let lineaAhorroHTML = '';
 		if (totalPagar24 < pv) {
-			let totalAhorrado24 = pv - totalPagar24; // Cifra representada en positivo absoluto
+			let totalAhorrado24 = pv - totalPagar24;
 			lineaAhorroHTML = '<div class="linea-unificada">Total ahorrado: <span class="ahorro-morado">' + formatearImporte(totalAhorrado24) + ' €</span></div>';
 		}
 
@@ -576,7 +716,7 @@
 		HTML_final += '<div class="linea-unificada">Última cuota final de <b>' + formatearImporte(fv) + ' €</b></div>';
 		HTML_final += '<div class="linea-unificada">Importe total a pagar: <span class="total-verde">' + formatearImporte(totalPagar24) + ' €</span></div>';
 		HTML_final += '<div class="linea-unificada">Intereses devengados: <span class="interes-rojo">' + formatearImporte(intereses24) + ' €</span></div>';
-		HTML_final += lineaAhorroHTML; // Inyección de la línea morada bajo criterio condicional
+		HTML_final += lineaAhorroHTML;
 		
 		HTML_final += bloque36HTML;
 		HTML_final += '</div>';
@@ -598,11 +738,15 @@
 	}
 
 	document.addEventListener('DOMContentLoaded', () => {
-		cargarCSVDirecto();
+		iniciarCargaApp();
 		actualizarFirmaFechas();
 
 		document.getElementById("modal-price-input").addEventListener("keypress", (e) => {
 			if (e.key === "Enter") confirmarNuevoPrecio();
+		});
+
+		document.getElementById("modal-pass-input").addEventListener("keypress", (e) => {
+			if (e.key === "Enter") confirmarPasswordModal();
 		});
 	});
 </script>
@@ -613,12 +757,17 @@
 			
 			<div id="upload-container" class="loading-card">
 				<div id="loading-message">
-					<span style="font-weight:600; color:var(--text-primary);">Cargando base de datos de tarifas...</span><br>
-					<small style="color:var(--text-secondary); display:block; margin-top:5px;">Leyendo 'PVP y RV.csv' desde la raíz del proyecto.</small>
+					<span style="font-weight:600; color:var(--text-primary);">Cargando base de datos protegida...</span><br>
+					<small style="color:var(--text-secondary); display:block; margin-top:5px;">Descifrando 'PVP y RV.enc'...</small>
 				</div>
 			</div>
 
 			<div class="simulador-grid" id="workspace" style="display: none;">
+				<div class="security-bar">
+					<span>🔒 Datos descifrados</span>
+					<button class="btn-link-danger" onclick="borrarContrasenaGuardada()">Olvidar clave guardada</button>
+				</div>
+
 				<div class="col-izquierda">
 					<div class="section-card">
 						<div class="section-title">Gama iPhone</div>
@@ -658,7 +807,20 @@
 			</div>
 		</div>
 
-		<!-- CUADRO DE DIÁLOGO MODAL PERSONALIZADO -->
+		<!-- MODAL SOLICITUD DE CONTRASEÑA DE ACCESO -->
+		<div id="password-modal" class="modal-overlay">
+			<div class="modal-box" onclick="event.stopPropagation()">
+				<h4>Base de Datos Protegida</h4>
+				<p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:12px;">Introduce la contraseña para descifrar las tarifas.</p>
+				<div id="pass-error-msg" class="error-msg"></div>
+				<input type="password" id="modal-pass-input" class="modal-input" placeholder="Contraseña de acceso">
+				<div class="modal-buttons">
+					<button class="modal-btn modal-btn-confirm" onclick="confirmarPasswordModal()">Desbloquear</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- MODAL DE CAMBIO DE PRECIO PERSONALIZADO -->
 		<div id="custom-price-modal" class="modal-overlay" onclick="cerrarModalPrecio()">
 			<div class="modal-box" onclick="event.stopPropagation()">
 				<h4>Introduce el nuevo PVP</h4>
