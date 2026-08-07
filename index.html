@@ -96,28 +96,6 @@
 		border: 1px solid var(--border-color);
 	}
 
-	.security-bar {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		font-size: 0.8rem;
-		color: var(--text-secondary);
-		padding: 6px 12px;
-		background: #f1f1f4;
-		border-radius: var(--radius-sm);
-		margin-bottom: 12px;
-	}
-
-	.btn-link-danger {
-		background: none;
-		border: none;
-		color: var(--red-interest);
-		font-size: 0.8rem;
-		cursor: pointer;
-		text-decoration: underline;
-		padding: 0;
-	}
-
 	/* --- ACORDEONES Y BOTONES ULTRA COMPACTOS --- */
 	.family-accordion {
 		border: 1px solid var(--border-color);
@@ -406,12 +384,7 @@
 		} catch (e) {
 			console.warn("Fallo de descifrado:", e);
 			localStorage.removeItem(LOCAL_STORAGE_KEY);
-			
-			if (esAutoGuardado) {
-				pedirContrasenaModal("La contraseña guardada ha caducado o es incorrecta.");
-			} else {
-				mostrarErrorPassword("Contraseña incorrecta. Vuelve a intentarlo.");
-			}
+			pedirContrasenaModal("Contraseña incorrecta. Introduce la clave de nuevo.");
 		}
 	}
 
@@ -450,11 +423,6 @@
 		const errDiv = document.getElementById("pass-error-msg");
 		errDiv.textContent = txt;
 		errDiv.style.display = "block";
-	}
-
-	function borrarContrasenaGuardada() {
-		localStorage.removeItem(LOCAL_STORAGE_KEY);
-		location.reload();
 	}
 
 	// PROCESADO DEL TEXTO DESCIFRADO DEL CSV
@@ -763,11 +731,6 @@
 			</div>
 
 			<div class="simulador-grid" id="workspace" style="display: none;">
-				<div class="security-bar">
-					<span>🔒 Datos descifrados</span>
-					<button class="btn-link-danger" onclick="borrarContrasenaGuardada()">Olvidar clave guardada</button>
-				</div>
-
 				<div class="col-izquierda">
 					<div class="section-card">
 						<div class="section-title">Gama iPhone</div>
