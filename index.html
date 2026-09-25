@@ -85,7 +85,7 @@
 		margin: 8px 0;
 	}
 
-	/* --- ESTADO CARGANDO Y SEGURIDAD --- */
+	/* --- ESTADO CARGANDO --- */
 	.loading-card {
 		background: #f5f5f7;
 		padding: 30px;
@@ -96,7 +96,7 @@
 		border: 1px solid var(--border-color);
 	}
 
-	/* --- ACORDEONES Y BOTONES ULTRA COMPACTOS --- */
+	/* --- ACORDEONES Y BOTONES --- */
 	.family-accordion {
 		border: 1px solid var(--border-color);
 		border-radius: var(--radius-md);
@@ -126,7 +126,7 @@
 
 	.family-accordion.active .family-header::after { transform: rotate(-180deg); }
 	.family-content { max-height: 0; overflow: hidden; transition: max-height 0.25s ease-out; }
-	.family-accordion.active .family-content { max-height: 400px; }
+	.family-accordion.active .family-content { max-height: 450px; }
 
 	.button-grid {
 		display: grid;
@@ -242,7 +242,7 @@
 		display: block;
 	}
 
-	/* --- VENTANAS MODALES --- */
+	/* --- MODALES --- */
 	.modal-overlay {
 		position: fixed;
 		top: 0;
@@ -304,15 +304,13 @@
 	let VR = 0;
 	let VR2 = 0;
 	let ultimo_pv = 0;
-	let bonificacionSeleccionada = 0;
 	let bufferEncryptedData = null;
 
-	// DESCIFRADO MEDIANTE WEB CRYPTO API (AES-GCM + PBKDF2)
+	// DESCIFRADO WEB CRYPTO API (AES-GCM + PBKDF2)
 	async function descifrarDatos(arrayBuffer, password) {
 		const enc = new TextEncoder();
 		const data = new Uint8Array(arrayBuffer);
 
-		// Estructura del .enc: Salt (16 B) + IV (12 B) + Ciphertext
 		const salt = data.slice(0, 16);
 		const iv = data.slice(16, 28);
 		const ciphertext = data.slice(28);
@@ -348,7 +346,7 @@
 		return dec.decode(decryptedContent);
 	}
 
-	// CARGA DEL ARCHIVO CIFRADO
+	// CARGA AUTOMÁTICA DEL ARCHIVO .ENC
 	async function iniciarCargaApp() {
 		try {
 			const response = await fetch(ARCHIVO_CIFRADO);
@@ -357,7 +355,6 @@
 			}
 			bufferEncryptedData = await response.arrayBuffer();
 
-			// Verificar si hay contraseña guardada en LocalStorage
 			const passGuardada = localStorage.getItem(LOCAL_STORAGE_KEY);
 			if (passGuardada) {
 				intentarDescifrado(passGuardada, true);
@@ -367,19 +364,16 @@
 		} catch (error) {
 			console.error(error);
 			document.getElementById("loading-message").innerHTML = 
-				"<span style='color:var(--red-interest); font-weight:600;'>Error al cargar los datos cifrados.</span><br>" +
-				`Asegúrate de que el archivo <b>${ARCHIVO_CIFRADO}</b> está presente en la raíz.`;
+				"<span style='color:var(--red-interest); font-weight:600;'>Error al cargar el archivo de tarifas.</span><br>" +
+				`Asegúrate de haber generado <b>${ARCHIVO_CIFRADO}</b> y tenerlo junto a este archivo HTML.`;
 		}
 	}
 
 	async function intentarDescifrado(password, esAutoGuardado = false) {
 		try {
 			const csvTexto = await descifrarDatos(bufferEncryptedData, password);
-			
-			// Guardar contraseña válida
 			localStorage.setItem(LOCAL_STORAGE_KEY, password);
 			cerrarModalPassword();
-			
 			procesarContenidoCSV(csvTexto);
 		} catch (e) {
 			console.warn("Fallo de descifrado:", e);
@@ -425,13 +419,13 @@
 		errDiv.style.display = "block";
 	}
 
-	// PROCESADO DEL TEXTO DESCIFRADO DEL CSV
+	// PROCESADO EXCLUSIVO PARA MODELOS IPHONE
 	function procesarContenidoCSV(contents) {
 		const lineas = contents.split(/\r?\n/);
 		
 		datos_completos = {};
 		familias = {
-			"Familia iPhone 17": [],
+			"Familia iPhone 17 & Air": [],
 			"Familia iPhone 16 & Anteriores": []
 		};
 
@@ -459,7 +453,7 @@
 			if (!datos_completos[modelo]) {
 				datos_completos[modelo] = {};
 				if (modelo.includes("17") || modelo.toLowerCase().includes("air")) {
-					familias["Familia iPhone 17"].push(modelo);
+					familias["Familia iPhone 17 & Air"].push(modelo);
 				} else {
 					familias["Familia iPhone 16 & Anteriores"].push(modelo);
 				}
@@ -468,7 +462,7 @@
 			datos_completos[modelo][capacidad] = { "PVP": pvp, "VR": vr24, "VR2": isNaN(vr36) ? 0 : vr36 };
 		}
 
-		familias["Familia iPhone 17"] = [...new Set(familias["Familia iPhone 17"])];
+		familias["Familia iPhone 17 & Air"] = [...new Set(familias["Familia iPhone 17 & Air"])];
 		familias["Familia iPhone 16 & Anteriores"] = [...new Set(familias["Familia iPhone 16 & Anteriores"])];
 
 		document.getElementById("upload-container").style.display = "none";
@@ -480,7 +474,7 @@
 		const container = document.getElementById("list-container");
 		container.innerHTML = "";
 
-		Object.keys(familias).forEach((famNombre, index) => {
+		Object.keys(familias).forEach((famNombre) => {
 			if (familias[famNombre].length === 0) return;
 
 			const accDiv = document.createElement("div");
@@ -532,14 +526,6 @@
 				Selecciona una capacidad de almacenamiento para calcular la financiación.
 			</div>
 		`;
-
-		const containerCompras = document.getElementById("compras-container");
-		if (modelo.includes("17") || modelo.toLowerCase().includes("air")) {
-			containerCompras.style.display = "block";
-		} else {
-			containerCompras.style.display = "none";
-			resetearBotonesBonif();
-		}
 
 		const ramaCapacidades = datos_completos[modelo];
 		const capacidades = Object.keys(ramaCapacidades);
@@ -608,44 +594,17 @@
 		return (rate * (pv - fv / Math.pow(1 + rate, nper))) / (1 - Math.pow(1 + rate, -nper));
 	}
 
-	function seleccionarBonificacion(valorDescuento, elementoBoton) {
-		const estabaSeleccionado = elementoBoton.classList.contains("selected");
-		
-		resetearBotonesBonif();
-
-		if (!estabaSeleccionado) {
-			elementoBoton.classList.add("selected");
-			bonificacionSeleccionada = valorDescuento;
-		} else {
-			bonificacionSeleccionada = 0;
-		}
-
-		if (ultimo_pv > 0) {
-			dibujaCuota(ultimo_pv, VR, VR2);
-			desplazarAbajo();
-		}
-	}
-
-	function resetearBotonesBonif() {
-		document.querySelectorAll(".bonif-btn").forEach(b => b.classList.remove("selected"));
-		bonificacionSeleccionada = 0;
-	}
-
 	function dibujaCuota(pv, fv, fv2) {	
 		const TIN24 = 10.57;
 		const TIN36 = 11.42;
 
-		const containerComprasVisible = document.getElementById("compras-container").style.display === "block";
-		let desctoEfectivo = containerComprasVisible ? bonificacionSeleccionada : 0;
-
-		// --- 24 meses ---
+		// --- Modalidad 24 meses ---
 		let rate24 = TIN24/100/12; 
 		let pmt24 = calcula(pv, rate24, 24, fv);
-		
 		let intereses24 = (pmt24 * 24) + fv - pv;
-		let totalPagar24 = ((pmt24 - desctoEfectivo) * 24) + fv;
+		let totalPagar24 = (pmt24 * 24) + fv;
 
-		let textoCuotas24 = '<span class="cuota-numero-azul">24</span> cuotas de <span class="cuota-highlight">' + formatearImporte(pmt24 - desctoEfectivo) + ' €</span>' + (desctoEfectivo > 0 ? ' <small style="color: var(--text-secondary); display: block;">(Con bonificación mensual aplicada)</small>' : '');
+		let textoCuotas24 = '<span class="cuota-numero-azul">24</span> cuotas de <span class="cuota-highlight">' + formatearImporte(pmt24) + ' €</span>';
 
 		let lineaAhorroHTML = '';
 		if (totalPagar24 < pv) {
@@ -653,7 +612,7 @@
 			lineaAhorroHTML = '<div class="linea-unificada">Total ahorrado: <span class="ahorro-morado">' + formatearImporte(totalAhorrado24) + ' €</span></div>';
 		}
 
-		// --- 36 meses ---
+		// --- Modalidad 36 meses (Solo si existe VR2 > 0: Air, 16 y 16e) ---
 		let bloque36HTML = '';
 		if (fv2 && fv2 > 0) {
 			let rate36 = TIN36/100/12; 
@@ -669,8 +628,8 @@
 			bloque36HTML += '<div class="linea-unificada">Intereses devengados: <span class="interes-rojo">' + formatearImporte(intereses36) + ' €</span></div>';
 		} else {
 			bloque36HTML += '<hr>';
-			bloque36HTML += '<div style="color: var(--text-secondary); font-size: 0.95rem; font-style: italic; padding: 10px 0;">';
-			bloque36HTML += 'Modalidad a 36 meses no disponible para esta capacidad';
+			bloque36HTML += '<div style="color: var(--text-secondary); font-size: 0.9rem; font-style: italic; padding: 8px 0;">';
+			bloque36HTML += 'Modalidad a 36 meses no disponible para este modelo';
 			bloque36HTML += '</div>';
 		}
 
@@ -721,7 +680,7 @@
 </head>
 	<body translate="no">
 		<div id="cuerpo">
-			<h2>Simulador PlanMy</h2>
+			<h2>Simulador PlanMy iPhone</h2>
 			
 			<div id="upload-container" class="loading-card">
 				<div id="loading-message">
@@ -740,16 +699,6 @@
 					<div id="capacidad-section" class="section-card" style="display: none;">
 						<div class="section-title">Capacidad</div>
 						<div id="capacidad-grid" class="button-grid"></div>
-					</div>
-
-					<!-- SELECTOR DE RANGOS DE COMPRA -->
-					<div id="compras-container" class="section-card" style="display: none;">
-						<div class="section-title">Volumen de compras mensuales</div>
-						<div class="button-grid">
-							<button class="pill-btn bonif-btn" onclick="seleccionarBonificacion(10, this)">> 125 € (-10 €/mes)</button>
-							<button class="pill-btn bonif-btn" onclick="seleccionarBonificacion(20, this)">> 325 € (-20 €/mes)</button>
-							<button class="pill-btn bonif-btn" onclick="seleccionarBonificacion(30, this)">> 650 € (-30 €/mes)</button>
-						</div>
 					</div>
 				</div>
 
@@ -770,7 +719,7 @@
 			</div>
 		</div>
 
-		<!-- MODAL SOLICITUD DE CONTRASEÑA DE ACCESO -->
+		<!-- MODAL SOLICITUD DE CONTRASEÑA -->
 		<div id="password-modal" class="modal-overlay">
 			<div class="modal-box" onclick="event.stopPropagation()">
 				<h4>Base de Datos Protegida</h4>
@@ -783,7 +732,7 @@
 			</div>
 		</div>
 
-		<!-- MODAL DE CAMBIO DE PRECIO PERSONALIZADO -->
+		<!-- MODAL CAMBIO DE PRECIO -->
 		<div id="custom-price-modal" class="modal-overlay" onclick="cerrarModalPrecio()">
 			<div class="modal-box" onclick="event.stopPropagation()">
 				<h4>Introduce el nuevo PVP</h4>
