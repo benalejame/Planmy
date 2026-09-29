@@ -300,6 +300,7 @@
 	let VR = 0;
 	let VR2 = 0;
 	let ultimo_pv = 0;
+	let bonificacionSeleccionada = 0;
 	let bufferEncryptedData = null;
 
 	async function descifrarDatos(arrayBuffer, password) {
@@ -413,7 +414,6 @@
 		errDiv.style.display = "block";
 	}
 
-	// PROCESADO INTELIGENTE (iPHONE vs APPLE WATCH)
 	function procesarContenidoCSV(contents) {
 		const lineas = contents.split(/\r?\n/);
 		
@@ -436,7 +436,6 @@
 
 			if (isNaN(pvp) || isNaN(vr24)) continue;
 
-			// Detección de Variante: Almacenamiento o Medida de caja
 			let matchCap = nombreBruto.match(/(128GB|256GB|512GB|1TB|2TB)/i);
 			let matchWatchSize = nombreBruto.match(/(40\/41\/42mm|44\/45\/46mm|49mm)/i);
 
@@ -483,12 +482,14 @@
 		
 		modeloSeleccionado = "";
 		varianteSeleccionada = "";
+		resetearBotonesBonif();
+		document.getElementById("compras-container").style.display = "none";
 		document.getElementById("variante-section").style.display = "none";
 		document.getElementById("variante-title").textContent = categorias[categoriaActual].labelVariante;
 		
 		document.getElementById("resultado").innerHTML = `
 			<div class="placeholder-resultado">
-				Por favor, selecciona un modelo y su ${categorias[categoriaActual].labelVariante.toLowerCase()} para visualizar el desglose del plan financiero.
+				Por favor, selecciona un modelo para visualizar el desglose del plan financiero.
 			</div>
 		`;
 
@@ -505,6 +506,12 @@
 		});
 	}
 
+	function esModeloConDescuento(nombreModelo) {
+		const m = nombreModelo.toLowerCase();
+		// Modelos válidos: 17e, 17, 17 pro, 17 pro max (excluye iPhone Air)
+		return m.includes("17") && !m.includes("air");
+	}
+
 	function seleccionarModelo(modelo, elementoBoton) {
 		document.querySelectorAll(".modelo-btn").forEach(btn => btn.classList.remove("selected"));
 		elementoBoton.classList.add("selected");
@@ -512,6 +519,21 @@
 		modeloSeleccionado = modelo;
 		varianteSeleccionada = "";
 		
+		document.getElementById("resultado").innerHTML = `
+			<div class="placeholder-resultado">
+				Selecciona una opción para calcular la financiación.
+			</div>
+		`;
+
+		// Activar módulo de compras si corresponde a 17e, 17, 17 Pro, 17 Pro Max
+		const containerCompras = document.getElementById("compras-container");
+		if (categoriaActual === "iPhone" && esModeloConDescuento(modelo)) {
+			containerCompras.style.display = "block";
+		} else {
+			containerCompras.style.display = "none";
+			resetearBotonesBonif();
+		}
+
 		const ramaVariantes = categorias[categoriaActual].datos[modelo];
 		const variantes = Object.keys(ramaVariantes);
 
@@ -538,6 +560,28 @@
 			});
 			varGrid.appendChild(btn);
 		});
+	}
+
+	function seleccionarBonificacion(valorDescuento, elementoBoton) {
+		const estabaSeleccionado = elementoBoton.classList.contains("selected");
+		resetearBotonesBonif();
+
+		if (!estabaSeleccionado) {
+			elementoBoton.classList.add("selected");
+			bonificacionSeleccionada = valorDescuento;
+		} else {
+			bonificacionSeleccionada = 0;
+		}
+
+		if (ultimo_pv > 0) {
+			dibujaCuota(ultimo_pv, VR, VR2);
+			desplazarAbajo();
+		}
+	}
+
+	function resetearBotonesBonif() {
+		document.querySelectorAll(".bonif-btn").forEach(b => b.classList.remove("selected"));
+		bonificacionSeleccionada = 0;
 	}
 
 	function abrirModalPrecio() {
@@ -583,13 +627,16 @@
 		const TIN24 = 10.57;
 		const TIN36 = 11.42;
 
+		const containerComprasVisible = document.getElementById("compras-container").style.display === "block";
+		let desctoEfectivo = containerComprasVisible ? bonificacionSeleccionada : 0;
+
 		// --- 24 meses ---
 		let rate24 = TIN24/100/12; 
 		let pmt24 = calcula(pv, rate24, 24, fv);
 		let intereses24 = (pmt24 * 24) + fv - pv;
-		let totalPagar24 = (pmt24 * 24) + fv;
+		let totalPagar24 = ((pmt24 - desctoEfectivo) * 24) + fv;
 
-		let textoCuotas24 = '<span class="cuota-numero-azul">24</span> cuotas de <span class="cuota-highlight">' + formatearImporte(pmt24) + ' €</span>';
+		let textoCuotas24 = '<span class="cuota-numero-azul">24</span> cuotas de <span class="cuota-highlight">' + formatearImporte(pmt24 - desctoEfectivo) + ' €</span>' + (desctoEfectivo > 0 ? ' <small style="color: var(--text-secondary); display: block;">(Con bonificación mensual aplicada)</small>' : '');
 
 		let lineaAhorroHTML = '';
 		if (totalPagar24 < pv) {
@@ -597,7 +644,7 @@
 			lineaAhorroHTML = '<div class="linea-unificada">Total ahorrado: <span class="ahorro-morado">' + formatearImporte(totalAhorrado24) + ' €</span></div>';
 		}
 
-		// --- 36 meses ---
+		// --- 36 meses (Solo si existe VR2 > 0: Air, 16 y 16e) ---
 		let bloque36HTML = '';
 		if (fv2 && fv2 > 0) {
 			let rate36 = TIN36/100/12; 
@@ -690,6 +737,16 @@
 					<div id="variante-section" class="section-card" style="display: none;">
 						<div class="section-title" id="variante-title">Capacidad</div>
 						<div id="variante-grid" class="button-grid"></div>
+					</div>
+
+					<!-- SELECTOR DE RANGOS DE COMPRA MENSUAL -->
+					<div id="compras-container" class="section-card" style="display: none;">
+						<div class="section-title">Volumen de compras mensuales</div>
+						<div class="button-grid">
+							<button class="pill-btn bonif-btn" onclick="seleccionarBonificacion(10, this)">> 125 € (-10 €/mes)</button>
+							<button class="pill-btn bonif-btn" onclick="seleccionarBonificacion(20, this)">> 325 € (-20 €/mes)</button>
+							<button class="pill-btn bonif-btn" onclick="seleccionarBonificacion(30, this)">> 650 € (-30 €/mes)</button>
+						</div>
 					</div>
 				</div>
 
