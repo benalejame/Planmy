@@ -508,8 +508,8 @@
 
 	function esModeloConDescuento(nombreModelo) {
 		const m = nombreModelo.toLowerCase();
-		// Modelos válidos: 17e, 17, 17 pro, 17 pro max (excluye iPhone Air)
-		return m.includes("17") && !m.includes("air");
+		// Modelos con bonificación: 17e, 17, 17 Pro, 17 Pro Max y 18 Pro
+		return (m.includes("17") && !m.includes("air")) || m.includes("18");
 	}
 
 	function seleccionarModelo(modelo, elementoBoton) {
@@ -525,7 +525,6 @@
 			</div>
 		`;
 
-		// Activar módulo de compras si corresponde a 17e, 17, 17 Pro, 17 Pro Max
 		const containerCompras = document.getElementById("compras-container");
 		if (categoriaActual === "iPhone" && esModeloConDescuento(modelo)) {
 			containerCompras.style.display = "block";
@@ -644,7 +643,7 @@
 			lineaAhorroHTML = '<div class="linea-unificada">Total ahorrado: <span class="ahorro-morado">' + formatearImporte(totalAhorrado24) + ' €</span></div>';
 		}
 
-		// --- 36 meses (Solo si existe VR2 > 0: Air, 16 y 16e) ---
+		// --- 36 meses (Solo disponible si RV 36m > 0 en el CSV) ---
 		let bloque36HTML = '';
 		if (fv2 && fv2 > 0) {
 			let rate36 = TIN36/100/12; 
